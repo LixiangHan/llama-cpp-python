@@ -1725,19 +1725,19 @@ def llama_set_n_threads(
 
 # // Set abort callback
 # LLAMA_API void llama_set_abort_callback(struct llama_context * ctx, ggml_abort_callback abort_callback, void * abort_callback_data);
-@ctypes_function(
-    "llama_set_abort_callback",
-    [llama_context_p_ctypes, ggml_abort_callback, ctypes.c_void_p],
-    None,
-)
-def llama_set_abort_callback(
-    ctx: llama_context_p,
-    abort_callback: Callable[[ctypes.c_void_p], None],
-    abort_callback_data: ctypes.c_void_p,
-    /,
-):
-    """Set abort callback"""
-    ...
+# @ctypes_function(
+#     "llama_set_abort_callback",
+#     [llama_context_p_ctypes, ggml_abort_callback, ctypes.c_void_p],
+#     None,
+# )
+# def llama_set_abort_callback(
+#     ctx: llama_context_p,
+#     abort_callback: Callable[[ctypes.c_void_p], None],
+#     abort_callback_data: ctypes.c_void_p,
+#     /,
+# ):
+#     """Set abort callback"""
+#     ...
 
 
 # // Token logits obtained from the last call to llama_decode()
@@ -2698,4 +2698,25 @@ def llama_log_set(
     None,
 )
 def llama_dump_timing_info_yaml(stream: ctypes.c_void_p, ctx: llama_context_p, /):
+    ...
+
+
+# LLAMA_API void llama_set_timestamp(struct llama_context * ctx, const char * name);
+@ctypes_function(
+    "llama_set_timestamp",
+    [llama_context_p_ctypes, ctypes.c_char_p],
+    None,
+)
+def llama_set_timestamp(ctx: llama_context_p, name: bytes):
+    """Set timestamp with name"""
+    ...
+
+# LLAMA_API int64_t llama_get_timestamp(struct llama_context * ctx, const char * name);
+@ctypes_function(
+    "llama_get_timestamp",
+    [llama_context_p_ctypes, ctypes.c_char_p],
+    ctypes.c_int64,
+)
+def llama_get_timestamp(ctx: llama_context_p, name: bytes) -> ctypes.c_int64:
+    """Get timestamp with name"""
     ...
