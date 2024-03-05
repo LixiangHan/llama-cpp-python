@@ -549,10 +549,7 @@ class llama_model_params(ctypes.Structure):
 #     uint32_t n_batch;           // prompt processing maximum batch size
 #     uint32_t n_threads;         // number of threads to use for generation
 #     uint32_t n_threads_batch;   // number of threads to use for batch processing
-
-#     enum llama_rope_scaling_type rope_scaling_type; // RoPE scaling type, from `enum llama_rope_scaling_type`
-#     enum llama_pooling_type      pooling_type;      // whether to pool (sum) embedding results by sequence id
-#                                                     // (ignored if no pooling layer)
+#     int32_t  rope_scaling_type; // RoPE scaling type, from `enum llama_rope_scaling_type`
 
 #     // ref: https://github.com/ggerganov/llama.cpp/pull/2054
 #     float    rope_freq_base;   // RoPE base frequency, 0 = from model
@@ -571,15 +568,13 @@ class llama_model_params(ctypes.Structure):
 #     enum ggml_type type_v; // data type for V cache
 
 #     // Keep the booleans together to avoid misalignment during copy-by-value.
-#     bool logits_all;  // the llama_decode() call computes all logits, not just the last one (DEPRECATED - set llama_batch.logits instead)
+#     bool mul_mat_q;   // if true, use experimental mul_mat_q kernels (DEPRECATED - always true)
+#     bool logits_all;  // the llama_eval() call computes all logits, not just the last one (DEPRECATED - setllama_batch.logits instead)
 #     bool embedding;   // embedding mode only
 #     bool offload_kqv; // whether to offload the KQV ops (including the KV cache) to GPU
+#     bool do_pooling;  // whether to pool (sum) embedding results by sequence id (ignored if no pooling layer)
 
-#     // Abort callback
-#     // if it returns true, execution of llama_decode() will be aborted
-#     // currently works only with CPU execution
-#     ggml_abort_callback abort_callback;
-#     void *              abort_callback_data;
+#     bool enable_timing;   // enable timing op
 # };
 class llama_context_params(ctypes.Structure):
     """Parameters for llama_context
@@ -591,7 +586,6 @@ class llama_context_params(ctypes.Structure):
         n_threads (int): number of threads to use for generation
         n_threads_batch (int): number of threads to use for batch processing
         rope_scaling_type (int): RoPE scaling type, from `enum llama_rope_scaling_type`
-        pooling_type (int): whether to pool (sum) embedding results by sequence id (ignored if no pooling layer)
         rope_freq_base (float): RoPE base frequency, 0 = from model
         rope_freq_scale (float): RoPE frequency scaling factor, 0 = from model
         yarn_ext_factor (float): YaRN extrapolation mix factor, negative = from model
@@ -604,11 +598,12 @@ class llama_context_params(ctypes.Structure):
         cb_eval_user_data (ctypes.ctypes.c_void_p): user data for cb_eval
         type_k (int): data type for K cache
         type_v (int): data type for V cache
+        mul_mat_q (bool): if true, use experimental mul_mat_q kernels (DEPRECATED - always true)
         logits_all (bool): the llama_eval() call computes all logits, not just the last one (DEPRECATED - set llama_batch.logits instead)
         embedding (bool): embedding mode only
         offload_kqv (bool): whether to offload the KQV ops (including the KV cache) to GPU
-        abort_callback (ggml_abort_callback): abort callback if it returns true, execution of llama_decode() will be aborted
-        abort_callback_data (ctypes.ctypes.c_void_p): data for abort_callback
+        do_pooling (pool): whether to pool (sum) embedding results by sequence id (ignored if no pooling layer)
+        enable_timing (bool): enable timing op
     """
 
     _fields_ = [
@@ -618,7 +613,6 @@ class llama_context_params(ctypes.Structure):
         ("n_threads", ctypes.c_uint32),
         ("n_threads_batch", ctypes.c_uint32),
         ("rope_scaling_type", ctypes.c_int),
-        ("pooling_type", ctypes.c_int),
         ("rope_freq_base", ctypes.c_float),
         ("rope_freq_scale", ctypes.c_float),
         ("yarn_ext_factor", ctypes.c_float),
@@ -631,11 +625,12 @@ class llama_context_params(ctypes.Structure):
         ("cb_eval_user_data", ctypes.c_void_p),
         ("type_k", ctypes.c_int),
         ("type_v", ctypes.c_int),
+        ("mul_mat_q", ctypes.c_bool),
         ("logits_all", ctypes.c_bool),
         ("embedding", ctypes.c_bool),
         ("offload_kqv", ctypes.c_bool),
-        ("abort_callback", ggml_abort_callback),
-        ("abort_callback_data", ctypes.c_void_p),
+        ("do_pooling", ctypes.c_bool),
+        ("enable_timing", ctypes.c_bool),
     ]
 
 
@@ -1723,22 +1718,6 @@ def llama_set_n_threads(
     """
     ...
 
-# // Set abort callback
-# LLAMA_API void llama_set_abort_callback(struct llama_context * ctx, ggml_abort_callback abort_callback, void * abort_callback_data);
-# @ctypes_function(
-#     "llama_set_abort_callback",
-#     [llama_context_p_ctypes, ggml_abort_callback, ctypes.c_void_p],
-#     None,
-# )
-# def llama_set_abort_callback(
-#     ctx: llama_context_p,
-#     abort_callback: Callable[[ctypes.c_void_p], None],
-#     abort_callback_data: ctypes.c_void_p,
-#     /,
-# ):
-#     """Set abort callback"""
-#     ...
-
 
 # // Token logits obtained from the last call to llama_decode()
 # // The logits for the last token are stored in the last row
@@ -2710,6 +2689,7 @@ def llama_dump_timing_info_yaml(stream: ctypes.c_void_p, ctx: llama_context_p, /
 def llama_set_timestamp(ctx: llama_context_p, name: bytes):
     """Set timestamp with name"""
     ...
+
 
 # LLAMA_API int64_t llama_get_timestamp(struct llama_context * ctx, const char * name);
 @ctypes_function(
